@@ -1,8 +1,14 @@
-﻿# CodeMonkey Player
+# CodeMonkey Player
+
+<!-- languages:start -->
+**한국어** · [English](docs/readme/README.en.md) · [日本語](docs/readme/README.ja.md) · [简体中文](docs/readme/README.zh-Hans.md) · [繁體中文](docs/readme/README.zh-Hant.md) · [Español](docs/readme/README.es.md) · [Français](docs/readme/README.fr.md) · [Deutsch](docs/readme/README.de.md) · [Português (Brasil)](docs/readme/README.pt-BR.md) · [Русский](docs/readme/README.ru.md) · [العربية](docs/readme/README.ar.md) · [हिन्दी](docs/readme/README.hi.md) · [Italiano](docs/readme/README.it.md) · [Bahasa Indonesia](docs/readme/README.id.md) · [Tiếng Việt](docs/readme/README.vi.md) · [ไทย](docs/readme/README.th.md) · [Türkçe](docs/readme/README.tr.md) · [Polski](docs/readme/README.pl.md)
+<!-- languages:end -->
 
 libmpv 엔진을 내장한 Windows x64용 .NET Framework 4.8 WinForms 미디어 플레이어입니다.
 
 ## 실행
+
+[최신 릴리즈](https://github.com/MisterPark/CodeMonkeyPlayer/releases/latest)에서 **CodeMonkeyPlayer-Setup.exe**를 내려받아 설치하세요. 설치 전에 언어, 설치 경로, 바탕화면 바로가기 및 동영상 연결 프로그램 등록 여부를 선택할 수 있습니다.
 
 빌드 결과인 CodeMonkeyPlayer/bin/Release/CodeMonkeyPlayer.exe를 실행하세요.
 배포할 때는 같은 폴더의 DLL 및 config 파일을 함께 복사해야 합니다.
@@ -55,7 +61,7 @@ Volume은 0~100이며 범위를 벗어난 숫자는 범위 내로 제한합니�
 전체 화면으로 종료하면 전체 화면 진입 전 창 배치를 복원하며, 전체 화면 자체는 자동 재진입하지 않습니다.
 모니터가 제거되거나 해상도가 변경되어 저장 위치가 화면 밖이면 현재 모니터의 작업 영역 안으로 조정합니다.
 
-## 단축키
+## 재생 엔진과 언어
 
 재생 명령과 mpv 이벤트 처리는 백그라운드 스레드에서 수행하여 UI와 종료를 막지 않도록 구성했습니다.
 연결 프로그램의 ProgID에는 Windows 동영상 썸네일 처리기를 등록합니다. Windows가 디코딩하지 못하는 영상은 여전히 아이콘으로 표시될 수 있습니다.
@@ -67,7 +73,9 @@ Volume은 0~100이며 범위를 벗어난 숫자는 범위 내로 제한합니�
 재생 목록 제목, 버튼 도움말, 접근성 이름, 상태·오류 메시지, 단축키 안내와 파일 열기 창의 제목·필터에 즉시 반영합니다.
 마지막 언어는 `%LocalAppData%\CodeMonkeyPlayer\CodeMonkeyPlayer.ini`의 `Language`에 언어 코드로 저장하고 다음 실행 시 복원합니다.
 지원 코드: `ko`, `en`, `ja`, `zh-Hans`, `zh-Hant`, `es`, `fr`, `de`, `pt-BR`, `ru`, `ar`, `hi`, `it`, `id`, `vi`, `th`, `tr`, `pl`.
-항목이 없거나 지원하지 않는 값이면 한국어를 사용합니다. Windows 기본 대화상자의 공통 버튼은 운영체제 언어를 따릅니다.
+저장된 언어가 없으면 설치 시 선택한 언어를 사용하며, 설치 언어도 없거나 지원하지 않는 값이면 한국어를 사용합니다. Windows 기본 대화상자의 공통 버튼은 운영체제 언어를 따릅니다.
+
+## 단축키
 
 | 키 | 동작 |
 | --- | --- |
@@ -136,16 +144,16 @@ Visual Studio에서 CodeMonkeyPlayer.slnx를 열고 빌드하거나,
 Visual Studio Developer PowerShell에서 다음 명령을 실행합니다.
 
 ```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File CodeMonkeyPlayer/Native/Restore-Mpv.ps1
 MSBuild CodeMonkeyPlayer/CodeMonkeyPlayer.csproj /p:Configuration=Release
-powershell.exe -NoProfile -STA -ExecutionPolicy Bypass -File tests/Smoke.ps1
+powershell.exe -NoProfile -STA -ExecutionPolicy Bypass -File tests/Smoke.ps1 -Configuration Release
 ```
 
 MSBuild는 Visual Studio의 .NET 데스크톱 개발 도구와 .NET Framework 4.8 타기팅 팩이 필요합니다.
-COM 참조를 생성하므로 dotnet build 대신 Visual Studio MSBuild를 사용하세요.
-WMP 형식 라이브러리 가져오기 과정에서 MSB3305 경고가 발생할 수 있습니다.
+플레이어 프로젝트는 Visual Studio MSBuild를 사용하세요. `Restore-Mpv.ps1`은 고정 버전의 libmpv를 내려받아 SHA-256을 검증합니다. 설치 파일 빌드 스크립트는 이 단계를 자동으로 수행합니다.
 
 스모크 테스트는 임시 무음 WAV 파일로 mpv 엔진 초기화, 재생, 일시 정지,
 탐색, 목록 중복 방지, 삭제, 자동 다음 파일 재생, 반복과 컨트롤 영역을 검증합니다.
 동영상의 화면 출력, 실제 오디오 출력, 전체 화면의 시각적 배치는 별도 수동 확인이 필요합니다.
 
-내장 엔진의 출처, 고정 해시와 배포 조건은 CodeMonkeyPlayer/Native/THIRD-PARTY-NOTICES.txt와 COPYING-mpv.txt를 참고하세요.
+내장 libmpv는 GPL을 활성화한 빌드입니다. 엔진의 출처, 고정 해시와 배포 조건은 [외부 구성 요소 안내](CodeMonkeyPlayer/Native/THIRD-PARTY-NOTICES.txt)와 [mpv 라이선스](CodeMonkeyPlayer/Native/COPYING-mpv.txt)를 참고하세요.
