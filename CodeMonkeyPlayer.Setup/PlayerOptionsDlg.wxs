@@ -1,0 +1,47 @@
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+  <Fragment>
+    <UI>
+      <Dialog Id="PlayerOptionsDlg" Width="370" Height="270" Title="[ProductName] Setup">
+        <Control Id="Title" Type="Text" X="15" Y="15" Width="340" Height="20" Text="{\WixUI_Font_Title}Installation options" />
+        <Control Id="Intro" Type="Text" X="20" Y="42" Width="330" Height="25" Text="Choose how CodeMonkey Player will be installed." />
+        <Control Id="Desktop" Type="CheckBox" X="20" Y="76" Width="330" Height="18" Property="DESKTOPSHORTCUT" CheckBoxValue="1" Text="Create a desktop shortcut" />
+        <Control Id="Associations" Type="CheckBox" X="20" Y="103" Width="330" Height="18" Property="REGISTERVIDEO" CheckBoxValue="1" Text="Add to Open with for supported video files" />
+        <Control Id="AssociationNote" Type="Text" X="35" Y="124" Width="310" Height="24" Text="Your current default video app will be kept." />
+        <Control Id="LanguageLabel" Type="Text" X="20" Y="157" Width="110" Height="18" Text="Initial app language:" />
+        <Control Id="Language" Type="ComboBox" X="135" Y="153" Width="210" Height="85" Property="APPLANGUAGE" ComboList="yes" Sorted="no">
+          <ComboBox Property="APPLANGUAGE">
+            <ListItem Value="ko" Text="Korean" />
+            <ListItem Value="en" Text="English" />
+            <ListItem Value="ja" Text="Japanese" />
+            <ListItem Value="zh-Hans" Text="Chinese (Simplified)" />
+            <ListItem Value="zh-Hant" Text="Chinese (Traditional)" />
+            <ListItem Value="es" Text="Spanish" />
+            <ListItem Value="fr" Text="French" />
+            <ListItem Value="de" Text="German" />
+            <ListItem Value="pt-BR" Text="Portuguese (Brazil)" />
+            <ListItem Value="ru" Text="Russian" />
+            <ListItem Value="ar" Text="Arabic" />
+            <ListItem Value="hi" Text="Hindi" />
+            <ListItem Value="it" Text="Italian" />
+            <ListItem Value="id" Text="Indonesian" />
+            <ListItem Value="vi" Text="Vietnamese" />
+            <ListItem Value="th" Text="Thai" />
+            <ListItem Value="tr" Text="Turkish" />
+            <ListItem Value="pl" Text="Polish" />
+          </ComboBox>
+        </Control>
+        <Control Id="LanguageNote" Type="Text" X="20" Y="188" Width="330" Height="32" Text="Existing personal language settings are kept. You can change the app language at any time in the player." />
+        <Control Id="Line" Type="Line" X="0" Y="234" Width="370" Height="0" />
+        <Control Id="Back" Type="PushButton" X="180" Y="243" Width="56" Height="17" Text="Back">
+          <Publish Event="NewDialog" Value="WelcomeDlg" Condition="1" />
+        </Control>
+        <Control Id="Next" Type="PushButton" X="236" Y="243" Width="56" Height="17" Default="yes" Text="Next">
+          <Publish Event="NewDialog" Value="InstallDirDlg" Condition="1" />
+        </Control>
+        <Control Id="Cancel" Type="PushButton" X="304" Y="243" Width="56" Height="17" Cancel="yes" Text="Cancel">
+          <Publish Event="SpawnDialog" Value="CancelDlg" Condition="1" />
+        </Control>
+      </Dialog>
+    </UI>
+  </Fragment>
+</Wix>

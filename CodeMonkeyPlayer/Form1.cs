@@ -1,14 +1,24 @@
-using System;
+﻿using System;
 using System.IO;
 using System.Linq;
 using System.Drawing;
 using System.Windows.Forms;
-using WMPLib;
+
 
 namespace CodeMonkeyPlayer
 {
     public partial class Form1 : Form
     {
+        private readonly UiText uiText = new UiText();
+        internal Action ShutdownStarted;
+        private string initialLanguage = "ko";
+        private readonly ComboBox languageSelector = new ComboBox();
+        private readonly Label playlistHeading = new Label();
+        private bool applyingLanguage;
+        private string statusKey = "파일을 열거나 영상 / 재생 목록으로 끌어다 놓으세요.";
+        private string statusDetail = "";
+        private object[] statusArguments = new object[0];
+        private readonly System.Collections.Generic.Dictionary<ButtonBase, IconText> iconText = new System.Collections.Generic.Dictionary<ButtonBase, IconText>();
         private readonly ListBox playlist = new ListBox();
         private readonly SeekTrackBar seek = new SeekTrackBar();
         private readonly SeekTrackBar volume = new SeekTrackBar { Compact = true };
@@ -36,9 +46,9 @@ namespace CodeMonkeyPlayer
         private int currentIndex = -1;
         private int generation;
         private bool seeking, fullscreen;
-        private bool frameStepBusy;
-        private string frameRatePath;
-        private double frameRate;
+
+
+
         private Rectangle restoredBounds;
         private FormWindowState restoredState;
         private static readonly string[] Extensions = { ".mp4", ".m4v", ".avi", ".wmv", ".mkv", ".mov", ".mpg", ".mpeg", ".webm", ".mp3", ".wav", ".wma", ".aac", ".flac", ".m4a" };
@@ -46,6 +56,7 @@ namespace CodeMonkeyPlayer
         public Form1() : this(PlayerPreferences.DefaultPath,
             Path.Combine(Path.GetDirectoryName(typeof(Form1).Assembly.Location), "CodeMonkeyPlayer.ini"))
         {
+            initialLanguage = PlayerPreferences.InstalledLanguage();
         }
 
         internal Form1(string settingsPath, string legacySettingsPath)
@@ -85,18 +96,13 @@ namespace CodeMonkeyPlayer
             };
             Shown += (s, e) =>
             {
-                axWindowsMediaPlayer1.uiMode = "none";
-                axWindowsMediaPlayer1.stretchToFit = true;
-                axWindowsMediaPlayer1.enableContextMenu = false;
-                axWindowsMediaPlayer1.settings.autoStart = true;
-                axWindowsMediaPlayer1.settings.volume = volume.Value;
+                video.Initialize();
                 RestorePreferences();
-                axWindowsMediaPlayer1.PlayStateChange += PlayerStateChanged;
-                axWindowsMediaPlayer1.MediaError += (sender, args) => status.Text = "재생할 수 없습니다. 파일 손상 여부와 Windows 코덱 지원을 확인하세요.";
-                axWindowsMediaPlayer1.KeyDownEvent += (sender, args) => HandleShortcut((Keys)args.nKeyCode | (ModifierKeys & Keys.Modifiers));
-                axWindowsMediaPlayer1.ClickEvent += (sender, args) => VideoClicked(args.nButton);
-                axWindowsMediaPlayer1.DoubleClickEvent += (sender, args) => VideoDoubleClicked(args.nButton);
-                videoDropTarget = new VideoFileDropTarget(axWindowsMediaPlayer1, files =>
+                video.StateChanged += PlayerStateChanged;
+                video.MediaError += (sender, args) => SetStatus("재생할 수 없습니다. 파일 손상 여부와 Windows 코덱 지원을 확인하세요.");
+                video.VideoKey += key => HandleShortcut(key);
+                video.VideoClick += twice => { if (twice) VideoDoubleClicked(1); else VideoClicked(1); };
+                videoDropTarget = new VideoFileDropTarget(video, files =>
                 {
                     videoClickTimer.Stop();
                     AddFiles(files);
@@ -107,19 +113,66 @@ namespace CodeMonkeyPlayer
                 timer.Start();
                 AddFiles(Environment.GetCommandLineArgs().Skip(1).ToArray());
             };
-            FormClosing += (s, e) => { SavePreferences(); generation++; timer.Stop(); dropRefreshTimer.Stop(); videoClickTimer.Stop(); if (videoDropTarget != null) videoDropTarget.Dispose(); axWindowsMediaPlayer1.close(); };
+            FormClosing += (s, e) =>
+            {
+                SavePreferences();
+                ShutdownStarted?.Invoke(); // Arm before any native codec/OLE teardown can block.
+                generation++;
+                timer.Stop(); dropRefreshTimer.Stop(); videoClickTimer.Stop();
+                if (videoDropTarget != null) videoDropTarget.Dispose();
+                video.Shutdown();
+            };
+        }
+
+        private sealed class IconText
+        {
+            public string Key;
+            public string Shortcut;
+        }
+
+        private string T(string key) => uiText.Get(key);
+
+        private void SetStatus(string key, params object[] arguments)
+        {
+            statusKey = key;
+            statusDetail = "";
+            statusArguments = arguments;
+            status.Text = string.Format(T(key), arguments);
+        }
+
+        private void ApplyLanguage(string language)
+        {
+            applyingLanguage = true;
+            try
+            {
+                uiText.Language = UiText.Normalize(language);
+                languageSelector.SelectedIndex = Array.FindIndex(UiText.Languages, option => option.Code == uiText.Language);
+                bool rtl = uiText.Language == "ar";
+                playlistHeading.RightToLeft = status.RightToLeft = rtl ? RightToLeft.Yes : RightToLeft.No;
+                playlistHeading.Text = T("재생 목록");
+                playlist.AccessibleName = T("재생 목록");
+                seek.AccessibleName = T("재생 위치");
+                volume.AccessibleName = T("음량");
+                languageSelector.AccessibleName = T("언어");
+                toolTips.SetToolTip(languageSelector, T("언어"));
+                foreach (var entry in iconText.ToArray())
+                    SetIcon(entry.Key, entry.Value.Key, entry.Value.Shortcut);
+                status.Text = string.Format(T(statusKey), statusArguments) + statusDetail;
+            }
+            finally { applyingLanguage = false; }
         }
 
         private void RestorePreferences()
         {
             settingsReady = false;
-            var settings = PlayerPreferences.Load(File.Exists(settingsPath) ? settingsPath : legacySettingsPath);
+            var settings = PlayerPreferences.Load(File.Exists(settingsPath) ? settingsPath : legacySettingsPath, initialLanguage);
+            ApplyLanguage(settings.Language);
             volume.Value = settings.Volume;
             mute.Checked = settings.Muted;
             repeat.Checked = settings.Repeat;
             RestoreWindowPlacement(settings);
-            axWindowsMediaPlayer1.settings.volume = volume.Value;
-            axWindowsMediaPlayer1.settings.mute = mute.Checked;
+            video.Volume = volume.Value;
+            video.Muted = mute.Checked;
             settingsReady = true;
             SavePreferences(); // Create the settings file on the first run as well.
         }
@@ -139,14 +192,14 @@ namespace CodeMonkeyPlayer
             {
                 new PlayerPreferences
                 {
-                    Volume = volume.Value, Muted = mute.Checked, Repeat = repeat.Checked,
+                    Volume = volume.Value, Muted = mute.Checked, Repeat = repeat.Checked, Language = uiText.Language,
                     WindowBounds = fullscreen ? restoredBounds : normalWindowBounds,
                     WindowMaximized = (fullscreen ? restoredState : lastWindowState) == FormWindowState.Maximized
                 }.Save(settingsPath);
             }
             catch (Exception error) when (error is IOException || error is UnauthorizedAccessException)
             {
-                status.Text = "설정을 저장하지 못했습니다. 사용자 설정 폴더의 쓰기 권한을 확인하세요.";
+                SetStatus("설정을 저장하지 못했습니다. 사용자 설정 폴더의 쓰기 권한을 확인하세요.");
                 toolTips.SetToolTip(status, settingsPath + "\n" + error.Message);
             }
         }
@@ -190,12 +243,15 @@ namespace CodeMonkeyPlayer
             ForeColor = Color.WhiteSmoke;
             KeyPreview = true;
             bar1.Visible = false;
-            axWindowsMediaPlayer1.Dock = DockStyle.Fill;
+            video.Dock = DockStyle.Fill;
             sidebar.Dock = DockStyle.Right;
             sidebar.Width = 240;
             sidebar.Padding = new Padding(12);
             sidebar.BackColor = Color.FromArgb(31, 34, 42);
-            var heading = new Label { Text = "재생 목록", Dock = DockStyle.Top, Height = 36, Font = new Font(Font, FontStyle.Bold) };
+            playlistHeading.Text = T("재생 목록");
+            playlistHeading.Dock = DockStyle.Top;
+            playlistHeading.Height = 36;
+            playlistHeading.Font = new Font(Font, FontStyle.Bold);
             playlist.Dock = DockStyle.Fill;
             playlist.BackColor = sidebar.BackColor;
             playlist.ForeColor = ForeColor;
@@ -212,7 +268,7 @@ namespace CodeMonkeyPlayer
             listActions.Controls.Add(MakeButton("삭제", (s, e) => RemoveSelected(), 65));
             listActions.Controls.Add(MakeButton("비우기", (s, e) => ClearPlaylist(), 65));
             sidebar.Controls.Add(playlist);
-            sidebar.Controls.Add(heading);
+            sidebar.Controls.Add(playlistHeading);
             sidebar.Controls.Add(listActions);
             transport.Dock = DockStyle.Bottom;
             transport.Height = 94;
@@ -251,7 +307,7 @@ namespace CodeMonkeyPlayer
 
             var row = new Panel { Dock = DockStyle.Fill };
             var actions = new FlowLayoutPanel { Dock = DockStyle.Left, Width = 460, WrapContents = false };
-            var secondary = new FlowLayoutPanel { Dock = DockStyle.Right, Width = 200, WrapContents = false, FlowDirection = FlowDirection.RightToLeft };
+            var secondary = new FlowLayoutPanel { Dock = DockStyle.Right, Width = 310, WrapContents = false, FlowDirection = FlowDirection.RightToLeft };
             row.Controls.Add(actions);
             row.Controls.Add(secondary);
 
@@ -265,7 +321,7 @@ namespace CodeMonkeyPlayer
             StyleToggle(mute, "음소거", "M");
             mute.CheckedChanged += (s, e) =>
             {
-                axWindowsMediaPlayer1.settings.mute = mute.Checked;
+                video.Muted = mute.Checked;
                 SetIcon(mute, mute.Checked ? "음소거 해제" : "음소거", "M");
             };
             actions.Controls.Add(mute);
@@ -276,7 +332,7 @@ namespace CodeMonkeyPlayer
             volume.BackColor = transport.BackColor;
 
             volume.AccessibleName = "음량";
-            volume.ValueChanged += (s, e) => axWindowsMediaPlayer1.settings.volume = volume.Value;
+            volume.ValueChanged += (s, e) => video.Volume = volume.Value;
             actions.Controls.Add(volume);
             actions.Controls.Add(time);
             StyleToggle(repeat, "목록 반복 켜기", "");
@@ -284,11 +340,39 @@ namespace CodeMonkeyPlayer
                 SetIcon(repeat, repeat.Checked ? "목록 반복 끄기" : "목록 반복 켜기", "");
 
             secondary.Controls.Add(MakeButton("전체 화면", (s, e) => ToggleFullscreen(), 85));
-            secondary.Controls.Add(MakeButton("도움말", (s, e) => MessageBox.Show(this,
-                "Ctrl+O: 파일 열기\nSpace: 재생 / 일시 정지\n, / .: 이전 / 다음 프레임 (지원하는 영상)\n← / →: 5초 이동\n↑ / ↓: 음량 조절\nM: 음소거\nPageUp / PageDown: 이전 / 다음 파일\nF11: 전체 화면\nEsc: 전체 화면 종료\nDelete: 선택한 목록 항목 삭제\n\n파일을 끌어다 놓거나 재생 목록을 두 번 클릭하세요.", "사용 방법"), 65));
+            secondary.Controls.Add(MakeButton("도움말", (s, e) => MessageBox.Show(this, T("단축키 안내"), T("사용 방법"),
+                MessageBoxButtons.OK, MessageBoxIcon.Information, MessageBoxDefaultButton.Button1,
+                uiText.Language == "ar" ? MessageBoxOptions.RtlReading | MessageBoxOptions.RightAlign : (MessageBoxOptions)0), 65));
+            languageSelector.DropDownStyle = ComboBoxStyle.DropDownList;
+            languageSelector.DrawMode = DrawMode.OwnerDrawFixed;
+            languageSelector.DrawItem += (s, e) =>
+            {
+                e.DrawBackground();
+                if (e.Index >= 0)
+                    TextRenderer.DrawText(e.Graphics, languageSelector.Items[e.Index].ToString(), e.Font,
+                        e.Bounds, e.ForeColor, TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis);
+                e.DrawFocusRectangle();
+            };
+            languageSelector.Items.AddRange(UiText.Languages);
+            languageSelector.DropDownWidth = 190;
+            languageSelector.MaxDropDownItems = 18;
+            languageSelector.IntegralHeight = false;
+            languageSelector.Width = 104;
+            languageSelector.Margin = new Padding(4, 8, 4, 0);
+            languageSelector.BackColor = Color.FromArgb(35, 35, 35);
+            languageSelector.ForeColor = Color.WhiteSmoke;
+            languageSelector.SelectedIndex = 0;
+            languageSelector.SelectedIndexChanged += (s, e) =>
+            {
+                if (applyingLanguage) return;
+                if (!(languageSelector.SelectedItem is UiText.LanguageOption selected)) return;
+                ApplyLanguage(selected.Code);
+                ScheduleSettingsSave();
+            };
+            secondary.Controls.Add(languageSelector);
             secondary.Controls.Add(repeat);
             secondary.Controls.Add(MakeButton("파일 열기", (s, e) => OpenFiles(), 38));
-            secondary.Controls.Add(MakeButton("정지", (s, e) => { generation++; axWindowsMediaPlayer1.Ctlcontrols.stop(); status.Text = "정지"; }, 38));
+            secondary.Controls.Add(MakeButton("정지", (s, e) => { generation++; video.Stop(); SetStatus("정지"); }, 38));
             status.Dock = DockStyle.Bottom;
             status.Height = 64;
             status.Padding = new Padding(0, 8, 0, 0);
@@ -296,14 +380,15 @@ namespace CodeMonkeyPlayer
             sidebar.Controls.Add(status);
             status.BringToFront();
             status.AutoEllipsis = true;
-            status.Text = "파일을 열거나 영상 / 재생 목록으로 끌어다 놓으세요.";
+            SetStatus("파일을 열거나 영상 / 재생 목록으로 끌어다 놓으세요.");
 
             transport.Controls.Add(row);
 
             transport.Controls.Add(seek);
             Controls.Add(sidebar);
             Controls.Add(transport);
-            axWindowsMediaPlayer1.BringToFront();
+            video.BringToFront();
+            ApplyLanguage(uiText.Language);
         }
 
         private Button MakeButton(string text, EventHandler click, int width)
@@ -332,10 +417,11 @@ namespace CodeMonkeyPlayer
 
         private void SetIcon(ButtonBase button, string name, string shortcut)
         {
-            if (button.AccessibleName == name) return;
+            if (button.AccessibleName == T(name)) return;
+            iconText[button] = new IconText { Key = name, Shortcut = shortcut };
             button.Text = "";
-            button.AccessibleName = name;
-            toolTips.SetToolTip(button, name + (shortcut.Length > 0 ? " (" + shortcut + ")" : ""));
+            button.AccessibleName = T(name);
+            toolTips.SetToolTip(button, T(name) + (shortcut.Length > 0 ? " (" + shortcut + ")" : ""));
             button.Invalidate();
         }
 
@@ -369,7 +455,7 @@ namespace CodeMonkeyPlayer
             {
                 pen.StartCap = pen.EndCap = System.Drawing.Drawing2D.LineCap.Round;
                 pen.LineJoin = System.Drawing.Drawing2D.LineJoin.Round;
-                switch (button.AccessibleName)
+                switch (iconText.ContainsKey(button) ? iconText[button].Key : button.AccessibleName)
                 {
                     case "재생":
                         g.FillPolygon(brush, new[] { new Point(7, 3), new Point(21, 12), new Point(7, 21) }); break;
@@ -378,7 +464,7 @@ namespace CodeMonkeyPlayer
                     case "정지": g.FillRectangle(brush, 5, 5, 14, 14); break;
                     case "이전":
                     case "다음":
-                        if (button.AccessibleName == "이전") { g.TranslateTransform(24, 0); g.ScaleTransform(-1, 1); }
+                        if (iconText.ContainsKey(button) ? iconText[button].Key == "이전" : button.AccessibleName == "이전") { g.TranslateTransform(24, 0); g.ScaleTransform(-1, 1); }
                         g.FillPolygon(brush, new[] { new Point(4, 4), new Point(17, 12), new Point(4, 20) });
                         g.DrawLine(pen, 20, 4, 20, 20); break;
                     case "파일 열기":
@@ -393,7 +479,7 @@ namespace CodeMonkeyPlayer
                     case "음소거":
                     case "음소거 해제":
                         g.DrawPolygon(pen, new[] { new Point(2, 9), new Point(6, 9), new Point(12, 4), new Point(12, 20), new Point(6, 15), new Point(2, 15) });
-                        if (button.AccessibleName == "음소거 해제")
+                        if (iconText.ContainsKey(button) ? iconText[button].Key == "음소거 해제" : button.AccessibleName == "음소거 해제")
                         { g.DrawLine(pen, 16, 9, 22, 15); g.DrawLine(pen, 22, 9, 16, 15); }
                         else { g.DrawArc(pen, 11, 7, 8, 10, -65, 130); g.DrawArc(pen, 10, 3, 13, 18, -60, 120); }
                         break;
@@ -419,12 +505,19 @@ namespace CodeMonkeyPlayer
 
         private void OpenFiles()
         {
-            using (var dialog = new OpenFileDialog { Multiselect = true, Title = "재생할 파일 선택",
-                Filter = "미디어 파일|" + string.Join(";", Extensions.Select(x => "*" + x)) + "|모든 파일|*.*" })
+            using (var dialog = new OpenFileDialog { Multiselect = true, Title = T("재생할 파일 선택"),
+                Filter = T("미디어 파일") + "|" + string.Join(";", Extensions.Select(x => "*" + x)) + "|" + T("모든 파일") + "|*.*" })
                 if (dialog.ShowDialog(this) == DialogResult.OK) AddFiles(dialog.FileNames);
         }
 
-        private void AddFiles(string[] files)
+        internal void ReceiveFiles(string[] files)
+        {
+            AddFilesCore(files, true);
+            if (WindowState == FormWindowState.Minimized) WindowState = lastWindowState;
+            Activate();
+        }
+        private void AddFiles(string[] files) => AddFilesCore(files, true);
+        private void AddFilesCore(string[] files, bool startPlayback)
         {
             int first = -1, rejected = 0;
             foreach (string file in files)
@@ -437,24 +530,24 @@ namespace CodeMonkeyPlayer
                 if (index < 0) index = playlist.Items.Add(new MediaItem(path));
                 if (first < 0) first = index;
             }
-            if (first >= 0) PlayIndex(first);
-            if (rejected > 0) status.Text = rejected + "개 파일을 추가하지 못했습니다. 지원하는 미디어 파일인지 확인하세요.";
+            if (first >= 0 && startPlayback) PlayIndex(first);
+            if (rejected > 0) SetStatus("{0}개 파일을 추가하지 못했습니다. 지원하는 미디어 파일인지 확인하세요.", rejected);
         }
 
         private void PlayIndex(int index)
         {
             if (index < 0 || index >= playlist.Items.Count) return;
             var item = (MediaItem)playlist.Items[index];
-            if (!File.Exists(item.Path)) { status.Text = "파일을 찾을 수 없습니다: " + item.Path; return; }
+            if (!File.Exists(item.Path)) { SetStatus("파일을 찾을 수 없습니다: {0}", item.Path); return; }
             generation++;
             videoClickTimer.Stop();
             currentIndex = index;
             playlist.SelectedIndex = index;
             seek.Value = 0;
             Text = item + " — CodeMonkey Player";
-            status.Text = "여는 중: " + item;
-            axWindowsMediaPlayer1.URL = item.Path;
-            axWindowsMediaPlayer1.Ctlcontrols.play();
+            SetStatus("여는 중: {0}", item.ToString());
+            video.Load(item.Path);
+            video.Play();
         }
 
         private void VideoClicked(int button)
@@ -462,7 +555,7 @@ namespace CodeMonkeyPlayer
             if (button != 1 || currentIndex < 0) return;
             if (!videoClickTimer.Enabled)
             {
-                playingBeforeVideoClick = axWindowsMediaPlayer1.playState == WMPPlayState.wmppsPlaying;
+                playingBeforeVideoClick = video.State == PlaybackState.Playing;
                 videoClickGeneration = generation;
             }
             TogglePlayback();
@@ -477,8 +570,8 @@ namespace CodeMonkeyPlayer
             // The first click responds immediately; a double click restores its prior state.
             if (videoClickTimer.Enabled && videoClickGeneration == generation && currentIndex >= 0)
             {
-                if (playingBeforeVideoClick) axWindowsMediaPlayer1.Ctlcontrols.play();
-                else axWindowsMediaPlayer1.Ctlcontrols.pause();
+                if (playingBeforeVideoClick) video.Play();
+                else video.Pause();
             }
             videoClickTimer.Stop();
             ToggleFullscreen();
@@ -487,9 +580,16 @@ namespace CodeMonkeyPlayer
         private void TogglePlayback()
         {
             generation++;
-            if (currentIndex < 0) { if (playlist.Items.Count > 0) PlayIndex(0); else OpenFiles(); return; }
-            if (axWindowsMediaPlayer1.playState == WMPPlayState.wmppsPlaying) axWindowsMediaPlayer1.Ctlcontrols.pause();
-            else axWindowsMediaPlayer1.Ctlcontrols.play();
+            if (currentIndex < 0 || video.State == PlaybackState.Stopped || video.State == PlaybackState.Ended)
+            {
+                if (playlist.Items.Count == 0) { OpenFiles(); return; }
+                int selected = playlist.SelectedIndex;
+                if (selected < 0) selected = currentIndex >= 0 && currentIndex < playlist.Items.Count ? currentIndex : 0;
+                PlayIndex(selected);
+                return;
+            }
+            if (video.State == PlaybackState.Playing) video.Pause();
+            else video.Play();
         }
 
         private void MoveTrack(int direction)
@@ -507,7 +607,7 @@ namespace CodeMonkeyPlayer
             if (index < 0) return;
             generation++;
             bool active = index == currentIndex;
-            if (active) { currentIndex = -1; axWindowsMediaPlayer1.close(); }
+            if (active) { currentIndex = -1; video.Stop(); }
             playlist.Items.RemoveAt(index);
             if (active && playlist.Items.Count > 0) PlayIndex(Math.Min(index, playlist.Items.Count - 1));
             else if (!active && index < currentIndex) currentIndex--;
@@ -518,7 +618,7 @@ namespace CodeMonkeyPlayer
         {
             generation++;
             currentIndex = -1;
-            axWindowsMediaPlayer1.close();
+            video.Stop();
             playlist.Items.Clear();
             ResetDisplay();
         }
@@ -526,22 +626,22 @@ namespace CodeMonkeyPlayer
         private void ResetDisplay()
         {
             Text = "CodeMonkey Player";
-            status.Text = "파일을 열거나 영상 / 재생 목록으로 끌어다 놓으세요.";
+            SetStatus("파일을 열거나 영상 / 재생 목록으로 끌어다 놓으세요.");
             seek.Value = 0;
             time.Text = "00:00 / 00:00";
         }
 
-        private double Duration { get { return axWindowsMediaPlayer1.currentMedia == null ? 0 : axWindowsMediaPlayer1.currentMedia.duration; } }
+        private double Duration => video.Duration;
 
         private void UpdatePlayback()
         {
             double duration = Duration;
             seek.Duration = duration;
-            double position = axWindowsMediaPlayer1.Ctlcontrols.currentPosition;
-            seek.Enabled = duration > 0 && axWindowsMediaPlayer1.Ctlcontrols.get_isAvailable("currentPosition");
+            double position = video.Position;
+            seek.Enabled = duration > 0 && video.Duration > 0;
             if (!seeking) seek.Value = duration > 0 ? (int)Math.Max(0, Math.Min(10000, position / duration * 10000)) : 0;
             time.Text = FormatTime(seeking ? seek.Value / 10000.0 * duration : position) + " / " + FormatTime(duration);
-            SetIcon(play, axWindowsMediaPlayer1.playState == WMPPlayState.wmppsPlaying ? "일시 정지" : "재생", "Space");
+            SetIcon(play, video.State == PlaybackState.Playing ? "일시 정지" : "재생", "Space");
         }
 
         private static string FormatTime(double seconds)
@@ -553,138 +653,29 @@ namespace CodeMonkeyPlayer
         private void CommitSeek()
         {
             generation++;
-            if (seek.Enabled && Duration > 0) axWindowsMediaPlayer1.Ctlcontrols.currentPosition = seek.Value / 10000.0 * Duration;
+            if (seek.Enabled && Duration > 0) video.Seek(seek.Value / 10000.0 * Duration);
         }
 
-        private async void StepFrame(int direction)
+        private void StepFrame(int direction)
         {
-            if (frameStepBusy || currentIndex < 0 || axWindowsMediaPlayer1.currentMedia == null) return;
-            var controls = axWindowsMediaPlayer1.Ctlcontrols as IWMPControls2;
-            if (controls == null || !controls.get_isAvailable("step"))
-            {
-                status.Text = "이 파일 또는 코덱은 프레임 이동을 지원하지 않습니다.";
-                return;
-            }
+            if (currentIndex < 0 || video.Duration <= 0) return;
+            if (string.IsNullOrEmpty(video.VideoFormat)) return;
             videoClickTimer.Stop();
-            int request = ++generation;
-            frameStepBusy = true;
-            try
-            {
-                double expectedPrevious = -1;
-                double fps = 0;
-                // WMP commands are asynchronous. Wait for pause before issuing a step.
-                controls.pause();
-                for (int i = 0; i < 50 && axWindowsMediaPlayer1.playState != WMPPlayState.wmppsPaused; i++)
-                {
-                    await System.Threading.Tasks.Task.Delay(20);
-                    if (IsDisposed || request != generation) return;
-                }
-                if (axWindowsMediaPlayer1.playState != WMPPlayState.wmppsPaused) return;
-                if (direction < 0)
-                {
-                    fps = ReadFrameRate(axWindowsMediaPlayer1.URL);
-                    if (fps <= 0)
-                    {
-                        status.Text = "영상의 FPS를 확인할 수 없어 이전 프레임 이동을 사용할 수 없습니다.";
-                        return;
-                    }
-                    double origin = controls.currentPosition;
-                    if (origin < 1.0 / fps) return;
-                    // Do not call step(-1): some decoders jump to the previous keyframe.
-                    // Some decoders use the first forward step only to paint the
-                    // sought frame; others advance. Start at the desired timestamp.
-                    double target = Math.Max(0, origin - 1.0 / fps);
-                    expectedPrevious = target;
-                    controls.currentPosition = target;
-                    int stable = 0;
-                    for (int i = 0; i < 50 && stable < 3; i++)
-                    {
-                        await System.Threading.Tasks.Task.Delay(20);
-                        if (IsDisposed || request != generation) return;
-                        stable = Math.Abs(controls.currentPosition - target) < 0.5 / fps ? stable + 1 : 0;
-                    }
-                    if (stable < 3)
-                    {
-                        status.Text = "이 코덱은 정밀 탐색을 지원하지 않아 프레임 이동을 완료하지 못했습니다.";
-                        return;
-                    }
-                }
-                if (IsDisposed || request != generation) return;
-                double beforeStep = controls.currentPosition;
-                controls.step(1);
-                // Avoid overlapping step requests while the decoder updates its frame.
-                await System.Threading.Tasks.Task.Delay(80);
-                if (IsDisposed || request != generation) return;
-                if (direction > 0)
-                {
-                    // A first step after seeking may only refresh the current frame.
-                    for (int i = 0; i < 2 && controls.currentPosition <= beforeStep + 0.0001; i++)
-                    {
-                        controls.step(1);
-                        await System.Threading.Tasks.Task.Delay(80);
-                        if (IsDisposed || request != generation) return;
-                    }
-                }
-                else if (controls.currentPosition > expectedPrevious + 0.5 / fps)
-                {
-                    // This decoder advanced while painting: compensate exactly once.
-                    controls.currentPosition = Math.Max(0, expectedPrevious - 1.0 / fps);
-                    await System.Threading.Tasks.Task.Delay(80);
-                    if (IsDisposed || request != generation) return;
-                    controls.step(1);
-                    await System.Threading.Tasks.Task.Delay(80);
-                    if (IsDisposed || request != generation) return;
-                }
-                UpdatePlayback();
-            }
-            catch (System.Runtime.InteropServices.COMException)
-            {
-                if (!IsDisposed) status.Text = "프레임을 이동하지 못했습니다. 파일 또는 코덱의 지원 여부를 확인하세요.";
-            }
-            finally { frameStepBusy = false; }
+            generation++;
+            video.Step(direction);
         }
+        private void PlayerStateChanged(object sender, EventArgs e)
+        {
+            var state = video.State;
+            if (state == PlaybackState.Playing) SetStatus("재생 중: {0}", Path.GetFileName(video.MediaPath));
+            else if (state == PlaybackState.Paused) SetStatus("일시 정지");
+            else if (state == PlaybackState.Buffering) SetStatus("버퍼링 중…");
+            else if (state == PlaybackState.Ended)
+            {
+                SetStatus("재생 완료");
 
-        private double ReadFrameRate(string path)
-        {
-            if (frameRatePath == path) return frameRate;
-            frameRatePath = path;
-            frameRate = 0;
-            object shell = null, folder = null, item = null;
-            try
-            {
-                shell = Activator.CreateInstance(Type.GetTypeFromProgID("Shell.Application"));
-                folder = ((dynamic)shell).NameSpace(Path.GetDirectoryName(path));
-                if (folder == null) return 0;
-                item = ((dynamic)folder).ParseName(Path.GetFileName(path));
-                if (item == null) return 0;
-                object value = ((dynamic)item).ExtendedProperty("System.Video.FrameRate");
-                // Windows exposes frames per 1000 seconds, not frames per second.
-                double fps = Convert.ToDouble(value, System.Globalization.CultureInfo.InvariantCulture) / 1000.0;
-                if (fps > 0 && fps <= 1000) frameRate = fps;
-            }
-            catch (System.Runtime.InteropServices.COMException) { }
-            catch (FormatException) { }
-            catch (InvalidCastException) { }
-            finally
-            {
-                foreach (object value in new[] { item, folder, shell })
-                    if (value != null && System.Runtime.InteropServices.Marshal.IsComObject(value))
-                        System.Runtime.InteropServices.Marshal.ReleaseComObject(value);
-            }
-            return frameRate;
-        }
-        private void PlayerStateChanged(object sender, AxWMPLib._WMPOCXEvents_PlayStateChangeEvent e)
-        {
-            var state = (WMPPlayState)e.newState;
-            if (state == WMPPlayState.wmppsPlaying) status.Text = "재생 중: " + Path.GetFileName(axWindowsMediaPlayer1.URL);
-            else if (state == WMPPlayState.wmppsPaused) status.Text = "일시 정지";
-            else if (state == WMPPlayState.wmppsBuffering) status.Text = "버퍼링 중…";
-            else if (state == WMPPlayState.wmppsMediaEnded)
-            {
-                status.Text = "재생 완료";
-                if (frameStepBusy) return;
                 int endedGeneration = generation;
-                // Defer URL changes until the COM state callback returns.
+                // Defer playlist changes until the playback callback returns.
                 BeginInvoke(new Action(() =>
                 {
                     if (!IsDisposed && generation == endedGeneration) MoveTrack(1);
@@ -735,6 +726,7 @@ namespace CodeMonkeyPlayer
 
         protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
         {
+            if (languageSelector.ContainsFocus) return base.ProcessCmdKey(ref msg, keyData);
             return HandleShortcut(keyData) || base.ProcessCmdKey(ref msg, keyData);
         }
 
@@ -756,8 +748,8 @@ namespace CodeMonkeyPlayer
                 case Keys.Left:
                 case Keys.Right:
                     generation++;
-                    if (Duration > 0 && axWindowsMediaPlayer1.Ctlcontrols.get_isAvailable("currentPosition"))
-                        axWindowsMediaPlayer1.Ctlcontrols.currentPosition = Math.Max(0, Math.Min(Duration, axWindowsMediaPlayer1.Ctlcontrols.currentPosition + (key == Keys.Right ? 5 : -5)));
+                    if (Duration > 0 && video.Duration > 0)
+                        video.Seek(Math.Max(0, Math.Min(Duration, video.Position + (key == Keys.Right ? 5 : -5))));
                     return true;
                 default: return false;
             }
@@ -923,12 +915,3 @@ namespace CodeMonkeyPlayer
         }
     }
 }
-
-
-
-
-
-
-
-
-

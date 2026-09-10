@@ -1,9 +1,7 @@
-$ErrorActionPreference='Stop'
+﻿$ErrorActionPreference='Stop'
 Add-Type -AssemblyName System.Windows.Forms
 $root=Split-Path -Parent $PSScriptRoot
 $bin=Join-Path $root 'CodeMonkeyPlayer/bin/Release-updated'
-[Reflection.Assembly]::LoadFrom((Join-Path $bin 'Interop.WMPLib.dll')) | Out-Null
-[Reflection.Assembly]::LoadFrom((Join-Path $bin 'AxInterop.WMPLib.dll')) | Out-Null
 $a=[Reflection.Assembly]::LoadFrom((Join-Path $bin 'CodeMonkeyPlayer.exe'))
 $f=[Activator]::CreateInstance($a.GetType('CodeMonkeyPlayer.Form1'))
 $exeIcon=[Drawing.Icon]::ExtractAssociatedIcon((Join-Path $bin 'CodeMonkeyPlayer.exe'))

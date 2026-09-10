@@ -1,4 +1,5 @@
 <Solution>
   <Project Path="CodeMonkeyPlayer/CodeMonkeyPlayer.csproj" Id="b89b5357-e924-4137-b1ef-950811f188e4" />
   <Project Path="CodeMonkeyPlayer.Setup/CodeMonkeyPlayer.Setup.wixproj" />
+  <Project Path="CodeMonkeyPlayer.Setup.Launcher/CodeMonkeyPlayer.Setup.Launcher.csproj" />
 </Solution>

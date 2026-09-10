@@ -28,23 +28,20 @@
         /// </summary>
         private void InitializeComponent()
         {
-            System.ComponentModel.ComponentResourceManager resources = new System.ComponentModel.ComponentResourceManager(typeof(Form1));
-            this.axWindowsMediaPlayer1 = new AxWMPLib.AxWindowsMediaPlayer();
+            this.video = new MpvPlayer();
             this.bar1 = new System.Windows.Forms.Panel();
             this.bar2 = new System.Windows.Forms.Panel();
-            ((System.ComponentModel.ISupportInitialize)(this.axWindowsMediaPlayer1)).BeginInit();
             this.bar1.SuspendLayout();
             this.SuspendLayout();
             // 
-            // axWindowsMediaPlayer1
+            // video
             // 
-            this.axWindowsMediaPlayer1.AllowDrop = true;
-            this.axWindowsMediaPlayer1.Enabled = true;
-            this.axWindowsMediaPlayer1.Location = new System.Drawing.Point(46, 36);
-            this.axWindowsMediaPlayer1.Name = "axWindowsMediaPlayer1";
-            this.axWindowsMediaPlayer1.OcxState = ((System.Windows.Forms.AxHost.State)(resources.GetObject("axWindowsMediaPlayer1.OcxState")));
-            this.axWindowsMediaPlayer1.Size = new System.Drawing.Size(494, 300);
-            this.axWindowsMediaPlayer1.TabIndex = 0;
+            this.video.AllowDrop = true;
+            this.video.Enabled = true;
+            this.video.Location = new System.Drawing.Point(46, 36);
+            this.video.Name = "video";
+            this.video.Size = new System.Drawing.Size(494, 300);
+            this.video.TabIndex = 0;
             // 
             // bar1
             // 
@@ -70,12 +67,11 @@
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.ClientSize = new System.Drawing.Size(800, 450);
             this.Controls.Add(this.bar1);
-            this.Controls.Add(this.axWindowsMediaPlayer1);
+            this.Controls.Add(this.video);
             this.Name = "Form1";
             this.Text = "Form1";
             this.DragDrop += new System.Windows.Forms.DragEventHandler(this.Form1_DragDrop);
             this.DragEnter += new System.Windows.Forms.DragEventHandler(this.Form1_DragEnter);
-            ((System.ComponentModel.ISupportInitialize)(this.axWindowsMediaPlayer1)).EndInit();
             this.bar1.ResumeLayout(false);
             this.ResumeLayout(false);
 
@@ -83,7 +79,7 @@
 
         #endregion
 
-        private AxWMPLib.AxWindowsMediaPlayer axWindowsMediaPlayer1;
+        private MpvPlayer video;
         private System.Windows.Forms.Panel bar1;
         private System.Windows.Forms.Panel bar2;
     }

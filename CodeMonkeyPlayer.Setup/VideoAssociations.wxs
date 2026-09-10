@@ -1,0 +1,45 @@
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+  <Fragment>
+    <!-- Register candidates only. Do not write extension defaults or UserChoice. -->
+    <DirectoryRef Id="INSTALLFOLDER">
+      <Component Id="VideoAssociations" Guid="*" Condition="REGISTERVIDEO = &quot;1&quot;">
+        <RegistryValue Root="HKLM" Key="SOFTWARE\Classes\CodeMonkeyPlayer.Video" Type="string" Value="CodeMonkey Player video" KeyPath="yes" />
+        <RegistryValue Root="HKLM" Key="SOFTWARE\Classes\CodeMonkeyPlayer.Video\DefaultIcon" Type="string" Value="&quot;[INSTALLFOLDER]CodeMonkeyPlayer.exe&quot;,0" />
+        <RegistryValue Root="HKLM" Key="SOFTWARE\Classes\CodeMonkeyPlayer.Video\shellex\{e357fccd-a995-4576-b01f-234630154e96}" Type="string" Value="{9DBD2C50-62AD-11D0-B806-00C04FD706EC}" />
+        <RegistryValue Root="HKLM" Key="SOFTWARE\Classes\CodeMonkeyPlayer.Video\shell\open\command" Type="string" Value="&quot;[INSTALLFOLDER]CodeMonkeyPlayer.exe&quot; &quot;%1&quot;" />
+        <RegistryValue Root="HKLM" Key="SOFTWARE\Classes\Applications\CodeMonkeyPlayer.exe" Name="FriendlyAppName" Type="string" Value="CodeMonkey Player" />
+        <RegistryValue Root="HKLM" Key="SOFTWARE\Classes\Applications\CodeMonkeyPlayer.exe\shell\open\command" Type="string" Value="&quot;[INSTALLFOLDER]CodeMonkeyPlayer.exe&quot; &quot;%1&quot;" />
+        <RegistryValue Root="HKLM" Key="SOFTWARE\MisterPark\CodeMonkeyPlayer\Capabilities" Name="ApplicationName" Type="string" Value="CodeMonkey Player" />
+        <RegistryValue Root="HKLM" Key="SOFTWARE\MisterPark\CodeMonkeyPlayer\Capabilities" Name="ApplicationDescription" Type="string" Value="Play video files with CodeMonkey Player." />
+        <RegistryValue Root="HKLM" Key="SOFTWARE\RegisteredApplications" Name="CodeMonkey Player" Type="string" Value="SOFTWARE\MisterPark\CodeMonkeyPlayer\Capabilities" />
+        <RegistryValue Root="HKLM" Key="SOFTWARE\Classes\.mp4\OpenWithProgids" Name="CodeMonkeyPlayer.Video" Type="string" Value="" />
+        <RegistryValue Root="HKLM" Key="SOFTWARE\Classes\Applications\CodeMonkeyPlayer.exe\SupportedTypes" Name=".mp4" Type="string" Value="" />
+        <RegistryValue Root="HKLM" Key="SOFTWARE\MisterPark\CodeMonkeyPlayer\Capabilities\FileAssociations" Name=".mp4" Type="string" Value="CodeMonkeyPlayer.Video" />
+        <RegistryValue Root="HKLM" Key="SOFTWARE\Classes\.m4v\OpenWithProgids" Name="CodeMonkeyPlayer.Video" Type="string" Value="" />
+        <RegistryValue Root="HKLM" Key="SOFTWARE\Classes\Applications\CodeMonkeyPlayer.exe\SupportedTypes" Name=".m4v" Type="string" Value="" />
+        <RegistryValue Root="HKLM" Key="SOFTWARE\MisterPark\CodeMonkeyPlayer\Capabilities\FileAssociations" Name=".m4v" Type="string" Value="CodeMonkeyPlayer.Video" />
+        <RegistryValue Root="HKLM" Key="SOFTWARE\Classes\.avi\OpenWithProgids" Name="CodeMonkeyPlayer.Video" Type="string" Value="" />
+        <RegistryValue Root="HKLM" Key="SOFTWARE\Classes\Applications\CodeMonkeyPlayer.exe\SupportedTypes" Name=".avi" Type="string" Value="" />
+        <RegistryValue Root="HKLM" Key="SOFTWARE\MisterPark\CodeMonkeyPlayer\Capabilities\FileAssociations" Name=".avi" Type="string" Value="CodeMonkeyPlayer.Video" />
+        <RegistryValue Root="HKLM" Key="SOFTWARE\Classes\.wmv\OpenWithProgids" Name="CodeMonkeyPlayer.Video" Type="string" Value="" />
+        <RegistryValue Root="HKLM" Key="SOFTWARE\Classes\Applications\CodeMonkeyPlayer.exe\SupportedTypes" Name=".wmv" Type="string" Value="" />
+        <RegistryValue Root="HKLM" Key="SOFTWARE\MisterPark\CodeMonkeyPlayer\Capabilities\FileAssociations" Name=".wmv" Type="string" Value="CodeMonkeyPlayer.Video" />
+        <RegistryValue Root="HKLM" Key="SOFTWARE\Classes\.mkv\OpenWithProgids" Name="CodeMonkeyPlayer.Video" Type="string" Value="" />
+        <RegistryValue Root="HKLM" Key="SOFTWARE\Classes\Applications\CodeMonkeyPlayer.exe\SupportedTypes" Name=".mkv" Type="string" Value="" />
+        <RegistryValue Root="HKLM" Key="SOFTWARE\MisterPark\CodeMonkeyPlayer\Capabilities\FileAssociations" Name=".mkv" Type="string" Value="CodeMonkeyPlayer.Video" />
+        <RegistryValue Root="HKLM" Key="SOFTWARE\Classes\.mov\OpenWithProgids" Name="CodeMonkeyPlayer.Video" Type="string" Value="" />
+        <RegistryValue Root="HKLM" Key="SOFTWARE\Classes\Applications\CodeMonkeyPlayer.exe\SupportedTypes" Name=".mov" Type="string" Value="" />
+        <RegistryValue Root="HKLM" Key="SOFTWARE\MisterPark\CodeMonkeyPlayer\Capabilities\FileAssociations" Name=".mov" Type="string" Value="CodeMonkeyPlayer.Video" />
+        <RegistryValue Root="HKLM" Key="SOFTWARE\Classes\.mpg\OpenWithProgids" Name="CodeMonkeyPlayer.Video" Type="string" Value="" />
+        <RegistryValue Root="HKLM" Key="SOFTWARE\Classes\Applications\CodeMonkeyPlayer.exe\SupportedTypes" Name=".mpg" Type="string" Value="" />
+        <RegistryValue Root="HKLM" Key="SOFTWARE\MisterPark\CodeMonkeyPlayer\Capabilities\FileAssociations" Name=".mpg" Type="string" Value="CodeMonkeyPlayer.Video" />
+        <RegistryValue Root="HKLM" Key="SOFTWARE\Classes\.mpeg\OpenWithProgids" Name="CodeMonkeyPlayer.Video" Type="string" Value="" />
+        <RegistryValue Root="HKLM" Key="SOFTWARE\Classes\Applications\CodeMonkeyPlayer.exe\SupportedTypes" Name=".mpeg" Type="string" Value="" />
+        <RegistryValue Root="HKLM" Key="SOFTWARE\MisterPark\CodeMonkeyPlayer\Capabilities\FileAssociations" Name=".mpeg" Type="string" Value="CodeMonkeyPlayer.Video" />
+        <RegistryValue Root="HKLM" Key="SOFTWARE\Classes\.webm\OpenWithProgids" Name="CodeMonkeyPlayer.Video" Type="string" Value="" />
+        <RegistryValue Root="HKLM" Key="SOFTWARE\Classes\Applications\CodeMonkeyPlayer.exe\SupportedTypes" Name=".webm" Type="string" Value="" />
+        <RegistryValue Root="HKLM" Key="SOFTWARE\MisterPark\CodeMonkeyPlayer\Capabilities\FileAssociations" Name=".webm" Type="string" Value="CodeMonkeyPlayer.Video" />
+      </Component>
+    </DirectoryRef>
+  </Fragment>
+</Wix>

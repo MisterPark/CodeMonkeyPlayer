@@ -8,3 +8,4 @@ CodeMonkeyPlayer.ini
 tests/settings-test-*/
 tests/*-preview.png
 tests/smoke*.wav
+CodeMonkeyPlayer/Native/*.dll

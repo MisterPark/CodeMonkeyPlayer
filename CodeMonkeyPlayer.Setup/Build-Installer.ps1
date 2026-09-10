@@ -1,6 +1,7 @@
 param([ValidateSet('Debug','Release')][string]$Configuration='Release')
 $ErrorActionPreference='Stop'
 $root=Split-Path -Parent $PSScriptRoot
+& (Join-Path $root 'CodeMonkeyPlayer/Native/Restore-Mpv.ps1')
 $vswhere=Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio/Installer/vswhere.exe'
 if (!(Test-Path -LiteralPath $vswhere)) { throw 'Visual Studio Build Tools with .NET desktop development is required.' }
 $msbuild=& $vswhere -latest -products '*' -requires Microsoft.Component.MSBuild -find 'MSBuild/**/Bin/MSBuild.exe' | Select-Object -First 1
@@ -10,4 +11,9 @@ $payload=Join-Path $PSScriptRoot "obj/payload/$Configuration"
 if ($LASTEXITCODE -ne 0) { throw 'Player build failed.' }
 dotnet build (Join-Path $PSScriptRoot 'CodeMonkeyPlayer.Setup.wixproj') -c $Configuration /p:BuildProjectReferences=false "/p:PayloadDir=$payload"
 if ($LASTEXITCODE -ne 0) { throw 'Installer build failed.' }
+$msi=Join-Path $PSScriptRoot "bin/$Configuration/CodeMonkeyPlayer-Setup.msi"
+& $msbuild (Join-Path $root 'CodeMonkeyPlayer.Setup.Launcher/CodeMonkeyPlayer.Setup.Launcher.csproj') /t:Rebuild /p:BuildProjectReferences=false "/p:Configuration=$Configuration" "/p:MsiPath=$msi" /nologo /verbosity:minimal
+if ($LASTEXITCODE -ne 0) { throw 'Localized setup launcher build failed.' }
+Copy-Item -LiteralPath (Join-Path $root "CodeMonkeyPlayer.Setup.Launcher/bin/$Configuration/CodeMonkeyPlayer-Setup.exe") -Destination (Join-Path $PSScriptRoot "bin/$Configuration/CodeMonkeyPlayer-Setup.exe")
+Get-Item (Join-Path $PSScriptRoot "bin/$Configuration/CodeMonkeyPlayer-Setup.exe") | Select-Object FullName,Length
 Get-ChildItem (Join-Path $PSScriptRoot "bin/$Configuration") -Filter '*.msi' -Recurse | Select-Object FullName,Length

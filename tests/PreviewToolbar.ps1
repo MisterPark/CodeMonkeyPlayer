@@ -1,8 +1,6 @@
-$ErrorActionPreference='Stop'
+﻿$ErrorActionPreference='Stop'
 Add-Type -AssemblyName System.Windows.Forms
 $bin=Join-Path (Get-Location) 'CodeMonkeyPlayer/bin/Release'
-[Reflection.Assembly]::LoadFrom((Join-Path $bin 'Interop.WMPLib.dll')) | Out-Null
-[Reflection.Assembly]::LoadFrom((Join-Path $bin 'AxInterop.WMPLib.dll')) | Out-Null
 $a=[Reflection.Assembly]::LoadFrom((Join-Path $bin 'CodeMonkeyPlayer.exe'))
 $f=[Activator]::CreateInstance($a.GetType('CodeMonkeyPlayer.Form1'))
 $flags=[Reflection.BindingFlags]'Instance,NonPublic'

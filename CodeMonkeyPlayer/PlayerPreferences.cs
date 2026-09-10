@@ -22,12 +22,26 @@ namespace CodeMonkeyPlayer
         public int Volume { get; set; } = 70;
         public bool Muted { get; set; }
         public bool Repeat { get; set; }
+        public string Language { get; set; } = "ko";
         public Rectangle? WindowBounds { get; set; }
         public bool WindowMaximized { get; set; }
 
-        public static PlayerPreferences Load(string path)
+        public static string InstalledLanguage()
         {
-            var settings = new PlayerPreferences();
+            try
+            {
+                using (var machine = Microsoft.Win32.RegistryKey.OpenBaseKey(Microsoft.Win32.RegistryHive.LocalMachine, Microsoft.Win32.RegistryView.Registry32))
+                using (var key = machine.OpenSubKey(@"SOFTWARE\MisterPark\CodeMonkeyPlayer\Setup"))
+                    return UiText.Normalize(key?.GetValue("Language") as string);
+            }
+            catch (System.Security.SecurityException) { return "ko"; }
+            catch (UnauthorizedAccessException) { return "ko"; }
+            catch (IOException) { return "ko"; }
+        }
+
+        public static PlayerPreferences Load(string path, string initialLanguage = "ko")
+        {
+            var settings = new PlayerPreferences { Language = UiText.Normalize(initialLanguage) };
             int? x = null, y = null, width = null, height = null;
             try
             {
@@ -45,6 +59,8 @@ namespace CodeMonkeyPlayer
                         settings.Muted = flag;
                     else if (key.Equals("Repeat", StringComparison.OrdinalIgnoreCase) && bool.TryParse(value, out flag))
                         settings.Repeat = flag;
+                    else if (key.Equals("Language", StringComparison.OrdinalIgnoreCase))
+                        settings.Language = UiText.Normalize(value);
                     else if (key.Equals("WindowMaximized", StringComparison.OrdinalIgnoreCase) && bool.TryParse(value, out flag))
                         settings.WindowMaximized = flag;
                     else if (int.TryParse(value, out number))
@@ -78,6 +94,7 @@ namespace CodeMonkeyPlayer
                     + "Volume=" + Math.Max(0, Math.Min(100, Volume)) + "\r\n"
                     + "Muted=" + Muted.ToString().ToLowerInvariant() + "\r\n"
                     + "Repeat=" + Repeat.ToString().ToLowerInvariant() + "\r\n";
+                contents += "Language=" + UiText.Normalize(Language) + "\r\n";
                 contents += "WindowMaximized=" + WindowMaximized.ToString().ToLowerInvariant() + "\r\n";
                 if (WindowBounds.HasValue)
                 {
