@@ -21,8 +21,12 @@ namespace CodeMonkeyPlayer
         private readonly Panel transport = new Panel();
         private readonly Timer timer;
         private readonly Timer settingsSaveTimer;
-        private readonly string settingsPath = Path.Combine(Path.GetDirectoryName(typeof(Form1).Assembly.Location), "CodeMonkeyPlayer.ini");
+        private readonly string settingsPath;
+        private readonly string legacySettingsPath;
         private bool settingsReady;
+        private Rectangle normalWindowBounds;
+        private FormWindowState lastWindowState = FormWindowState.Normal;
+        private bool changingWindowMode;
         private readonly Timer videoClickTimer;
         private readonly Timer dropRefreshTimer;
         private bool playingBeforeVideoClick;
@@ -39,8 +43,15 @@ namespace CodeMonkeyPlayer
         private FormWindowState restoredState;
         private static readonly string[] Extensions = { ".mp4", ".m4v", ".avi", ".wmv", ".mkv", ".mov", ".mpg", ".mpeg", ".webm", ".mp3", ".wav", ".wma", ".aac", ".flac", ".m4a" };
 
-        public Form1()
+        public Form1() : this(PlayerPreferences.DefaultPath,
+            Path.Combine(Path.GetDirectoryName(typeof(Form1).Assembly.Location), "CodeMonkeyPlayer.ini"))
         {
+        }
+
+        internal Form1(string settingsPath, string legacySettingsPath)
+        {
+            this.settingsPath = settingsPath;
+            this.legacySettingsPath = legacySettingsPath;
             InitializeComponent();
             using (var stream = typeof(Form1).Assembly.GetManifestResourceStream("CodeMonkeyPlayer.AppIcon.ico"))
             using (var sourceIcon = new Icon(stream))
@@ -54,6 +65,8 @@ namespace CodeMonkeyPlayer
             BuildInterface();
             settingsSaveTimer = new Timer(components) { Interval = 500 };
             settingsSaveTimer.Tick += (s, e) => SavePreferences();
+            LocationChanged += (s, e) => RememberWindowPlacement();
+            Resize += (s, e) => RememberWindowPlacement();
             volume.ValueChanged += (s, e) => ScheduleSettingsSave();
             mute.CheckedChanged += (s, e) => ScheduleSettingsSave();
             repeat.CheckedChanged += (s, e) => ScheduleSettingsSave();
@@ -100,10 +113,11 @@ namespace CodeMonkeyPlayer
         private void RestorePreferences()
         {
             settingsReady = false;
-            var settings = PlayerPreferences.Load(settingsPath);
+            var settings = PlayerPreferences.Load(File.Exists(settingsPath) ? settingsPath : legacySettingsPath);
             volume.Value = settings.Volume;
             mute.Checked = settings.Muted;
             repeat.Checked = settings.Repeat;
+            RestoreWindowPlacement(settings);
             axWindowsMediaPlayer1.settings.volume = volume.Value;
             axWindowsMediaPlayer1.settings.mute = mute.Checked;
             settingsReady = true;
@@ -123,13 +137,46 @@ namespace CodeMonkeyPlayer
             if (!settingsReady) return;
             try
             {
-                new PlayerPreferences { Volume = volume.Value, Muted = mute.Checked, Repeat = repeat.Checked }.Save(settingsPath);
+                new PlayerPreferences
+                {
+                    Volume = volume.Value, Muted = mute.Checked, Repeat = repeat.Checked,
+                    WindowBounds = fullscreen ? restoredBounds : normalWindowBounds,
+                    WindowMaximized = (fullscreen ? restoredState : lastWindowState) == FormWindowState.Maximized
+                }.Save(settingsPath);
             }
             catch (Exception error) when (error is IOException || error is UnauthorizedAccessException)
             {
-                status.Text = "설정을 저장하지 못했습니다. 프로그램 폴더의 쓰기 권한을 확인하세요.";
+                status.Text = "설정을 저장하지 못했습니다. 사용자 설정 폴더의 쓰기 권한을 확인하세요.";
                 toolTips.SetToolTip(status, settingsPath + "\n" + error.Message);
             }
+        }
+
+        private void RememberWindowPlacement()
+        {
+            if (!settingsReady || fullscreen || changingWindowMode) return;
+            if (WindowState == FormWindowState.Normal) normalWindowBounds = Bounds;
+            if (WindowState != FormWindowState.Minimized) lastWindowState = WindowState;
+            ScheduleSettingsSave();
+        }
+
+        private void RestoreWindowPlacement(PlayerPreferences settings)
+        {
+            WindowState = FormWindowState.Normal;
+            if (settings.WindowBounds.HasValue)
+            {
+                Rectangle saved = settings.WindowBounds.Value;
+                Rectangle area = Screen.FromRectangle(saved).WorkingArea;
+                int width = Math.Min(area.Width, Math.Max(MinimumSize.Width, saved.Width));
+                int height = Math.Min(area.Height, Math.Max(MinimumSize.Height, saved.Height));
+                // A removed monitor or changed display scaling must not strand the title bar.
+                MinimumSize = new Size(Math.Min(MinimumSize.Width, area.Width), Math.Min(MinimumSize.Height, area.Height));
+                StartPosition = FormStartPosition.Manual;
+                Bounds = new Rectangle(Math.Max(area.Left, Math.Min(saved.X, area.Right - width)),
+                    Math.Max(area.Top, Math.Min(saved.Y, area.Bottom - height)), width, height);
+            }
+            normalWindowBounds = Bounds;
+            lastWindowState = settings.WindowMaximized ? FormWindowState.Maximized : FormWindowState.Normal;
+            WindowState = lastWindowState;
         }
 
         private void BuildInterface()
@@ -647,6 +694,7 @@ namespace CodeMonkeyPlayer
 
         private void ToggleFullscreen()
         {
+            changingWindowMode = true;
             if (!fullscreen)
             {
                 restoredState = WindowState;
@@ -666,6 +714,9 @@ namespace CodeMonkeyPlayer
                 transport.Visible = true;
             }
             fullscreen = !fullscreen;
+            changingWindowMode = false;
+            RememberWindowPlacement();
+            ScheduleSettingsSave();
         }
 
         private void UpdateTransportVisibility()

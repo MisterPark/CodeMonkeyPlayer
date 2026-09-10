@@ -30,7 +30,9 @@ $bin = Join-Path $root "CodeMonkeyPlayer/bin/$Configuration"
 [Reflection.Assembly]::LoadFrom((Join-Path $bin 'Interop.WMPLib.dll')) | Out-Null
 [Reflection.Assembly]::LoadFrom((Join-Path $bin 'AxInterop.WMPLib.dll')) | Out-Null
 $assembly = [Reflection.Assembly]::LoadFrom((Join-Path $bin 'CodeMonkeyPlayer.exe'))
-$form = [Activator]::CreateInstance($assembly.GetType('CodeMonkeyPlayer.Form1'))
+$testPreferences = Join-Path $PSScriptRoot ('settings-test-'+[Guid]::NewGuid().ToString('N'))
+$constructor = $assembly.GetType('CodeMonkeyPlayer.Form1').GetConstructor([Reflection.BindingFlags]'Instance,NonPublic',$null,[type[]]@([string],[string]),$null)
+$form = $constructor.Invoke(@((Join-Path $testPreferences 'CodeMonkeyPlayer.ini').PSObject.BaseObject,(Join-Path $testPreferences 'legacy.ini').PSObject.BaseObject))
 $flags = [Reflection.BindingFlags]'Instance,NonPublic'
 function Field($name) { $form.GetType().GetField($name,$flags).GetValue($form) }
 function InvokePrivate($name, [object[]]$arguments) { $form.GetType().GetMethod($name,$flags).Invoke($form,$arguments) }
@@ -151,5 +153,7 @@ finally {
     if ($second -and (Test-Path -LiteralPath $second)) { Remove-Item -LiteralPath $second }
     if (Test-Path -LiteralPath $wav) { Remove-Item -LiteralPath $wav }
 }
+
+
 
 

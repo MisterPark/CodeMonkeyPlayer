@@ -1,0 +1,54 @@
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs" xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui">
+  <Package Name="CodeMonkey Player" Manufacturer="MisterPark" Version="1.0.1"
+           UpgradeCode="7EAD4850-3CC9-40E1-991B-1192AFCA2479" Scope="perMachine" Language="1033">
+    <MajorUpgrade DowngradeErrorMessage="A newer version of CodeMonkey Player is already installed." />
+    <MediaTemplate EmbedCab="yes" />
+    <Icon Id="AppIcon" SourceFile="..\CodeMonkeyPlayer\Assets\CodeMonkeyPlayer.ico" />
+    <Property Id="ARPPRODUCTICON" Value="AppIcon" />
+    <Property Id="ARPURLINFOABOUT" Value="https://github.com/MisterPark/CodeMonkeyPlayer" />
+    <Property Id="NETFRAMEWORK48">
+      <RegistrySearch Id="FindNet48" Root="HKLM" Key="SOFTWARE\Microsoft\NET Framework Setup\NDP\v4\Full" Name="Release" Type="raw" />
+    </Property>
+    <Property Id="WMPINSTALLED">
+      <RegistrySearch Id="FindWmp" Root="HKLM" Key="SOFTWARE\Classes\CLSID\{6BF52A52-394A-11D3-B153-00C04F79FAA6}\InprocServer32" Type="raw" />
+    </Property>
+    <Launch Condition="Installed OR NETFRAMEWORK48 &gt;= &quot;#528040&quot;" Message="Microsoft .NET Framework 4.8 or later is required." />
+    <Launch Condition="Installed OR WMPINSTALLED" Message="Enable Windows Media Player (Legacy) in Windows Optional Features before installing." />
+    <StandardDirectory Id="ProgramFilesFolder">
+      <Directory Id="INSTALLFOLDER" Name="CodeMonkey Player">
+        <Component Id="PlayerExecutable" Guid="*">
+          <File Id="PlayerExe" Source="$(var.PayloadDir)\CodeMonkeyPlayer.exe" KeyPath="yes" />
+        </Component>
+        <Component Id="PlayerConfiguration" Guid="*"><File Source="$(var.PayloadDir)\CodeMonkeyPlayer.exe.config" /></Component>
+        <Component Id="WmpInterop" Guid="*"><File Source="$(var.PayloadDir)\Interop.WMPLib.dll" /></Component>
+        <Component Id="WmpAxInterop" Guid="*"><File Source="$(var.PayloadDir)\AxInterop.WMPLib.dll" /></Component>
+      </Directory>
+    </StandardDirectory>
+    <StandardDirectory Id="ProgramMenuFolder">
+      <Directory Id="MenuFolder" Name="CodeMonkey Player">
+        <Component Id="StartMenuShortcut" Guid="*">
+          <Shortcut Id="StartPlayer" Name="CodeMonkey Player" Target="[INSTALLFOLDER]CodeMonkeyPlayer.exe" WorkingDirectory="INSTALLFOLDER" Icon="AppIcon" />
+          <RemoveFolder Id="RemoveMenuFolder" On="uninstall" />
+          <RegistryValue Root="HKCU" Key="Software\MisterPark\CodeMonkeyPlayer" Name="StartMenuShortcut" Type="integer" Value="1" KeyPath="yes" />
+        </Component>
+      </Directory>
+    </StandardDirectory>
+    <StandardDirectory Id="DesktopFolder">
+      <Component Id="DesktopShortcut" Guid="*">
+        <Shortcut Id="DesktopPlayer" Name="CodeMonkey Player" Target="[INSTALLFOLDER]CodeMonkeyPlayer.exe" WorkingDirectory="INSTALLFOLDER" Icon="AppIcon" />
+        <RegistryValue Root="HKCU" Key="Software\MisterPark\CodeMonkeyPlayer" Name="DesktopShortcut" Type="integer" Value="1" KeyPath="yes" />
+      </Component>
+    </StandardDirectory>
+    <Feature Id="Player" Title="CodeMonkey Player" Level="1">
+      <ComponentRef Id="PlayerExecutable" /><ComponentRef Id="PlayerConfiguration" />
+      <ComponentRef Id="WmpInterop" /><ComponentRef Id="WmpAxInterop" />
+      <ComponentRef Id="StartMenuShortcut" /><ComponentRef Id="DesktopShortcut" />
+    </Feature>
+    <ui:WixUI Id="WixUI_InstallDir" InstallDirectory="INSTALLFOLDER" />
+    <UI>
+      <Publish Dialog="WelcomeDlg" Control="Next" Event="NewDialog" Value="InstallDirDlg" Order="2" Condition="1" />
+      <Publish Dialog="InstallDirDlg" Control="Back" Event="NewDialog" Value="WelcomeDlg" Order="2" Condition="1" />
+    </UI>
+  </Package>
+</Wix>
+

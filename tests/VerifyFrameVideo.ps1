@@ -6,7 +6,9 @@ $bin=Join-Path $root "CodeMonkeyPlayer/bin/$Configuration"
 [Reflection.Assembly]::LoadFrom((Join-Path $bin 'Interop.WMPLib.dll')) | Out-Null
 [Reflection.Assembly]::LoadFrom((Join-Path $bin 'AxInterop.WMPLib.dll')) | Out-Null
 $a=[Reflection.Assembly]::LoadFrom((Join-Path $bin 'CodeMonkeyPlayer.exe'))
-$f=[Activator]::CreateInstance($a.GetType('CodeMonkeyPlayer.Form1'))
+$testPreferences=Join-Path $PSScriptRoot ('settings-test-'+[Guid]::NewGuid().ToString('N'))
+$constructor=$a.GetType('CodeMonkeyPlayer.Form1').GetConstructor([Reflection.BindingFlags]'Instance,NonPublic',$null,[type[]]@([string],[string]),$null)
+$f=$constructor.Invoke(@((Join-Path $testPreferences 'CodeMonkeyPlayer.ini').PSObject.BaseObject,(Join-Path $testPreferences 'legacy.ini').PSObject.BaseObject))
 $flags=[Reflection.BindingFlags]'Instance,NonPublic'
 function Field($name) { $f.GetType().GetField($name,$flags).GetValue($f) }
 function InvokePrivate($name,[object[]]$values) { $f.GetType().GetMethod($name,$flags).Invoke($f,$values) }
@@ -48,4 +50,6 @@ try {
     Write-Output 'PASS: forward/backward frame durations and stable paused positions across tested locations.'
     Write-Output ("status="+(Field 'status').Text)
 } finally { $f.Dispose() }
+
+
 

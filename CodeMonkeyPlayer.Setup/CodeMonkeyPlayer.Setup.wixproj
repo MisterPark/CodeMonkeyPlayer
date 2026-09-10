@@ -1,0 +1,16 @@
+<Project Sdk="WixToolset.Sdk/6.0.2">
+  <PropertyGroup>
+    <OutputType>Package</OutputType>
+    <OutputName>CodeMonkeyPlayer-Setup</OutputName>
+    <InstallerPlatform>x86</InstallerPlatform>
+    <PayloadDir Condition="'$(PayloadDir)' == ''">$(MSBuildThisFileDirectory)..\CodeMonkeyPlayer\bin\$(Configuration)</PayloadDir>
+    <DefineConstants>PayloadDir=$(PayloadDir)</DefineConstants>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\CodeMonkeyPlayer\CodeMonkeyPlayer.csproj" ReferenceOutputAssembly="false" />
+    <PackageReference Include="WixToolset.UI.wixext" Version="6.0.2" />
+  </ItemGroup>
+  <Target Name="CheckPayload" BeforeTargets="CoreCompile">
+    <Error Condition="!Exists('$(PayloadDir)\CodeMonkeyPlayer.exe')" Text="Build the player first using Build-Installer.ps1 (Visual Studio MSBuild is required for WMP COM references)." />
+  </Target>
+</Project>

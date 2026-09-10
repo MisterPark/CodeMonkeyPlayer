@@ -12,9 +12,10 @@ foreach($name in @('CodeMonkeyPlayer.exe','Interop.WMPLib.dll','AxInterop.WMPLib
 [Reflection.Assembly]::LoadFrom((Join-Path $runtime 'AxInterop.WMPLib.dll')) | Out-Null
 $a=[Reflection.Assembly]::LoadFrom((Join-Path $runtime 'CodeMonkeyPlayer.exe'))
 $flags=[Reflection.BindingFlags]'Instance,NonPublic'
-$ini=Join-Path $runtime 'CodeMonkeyPlayer.ini'
+$ini=Join-Path $runtime 'UserSettings/CodeMonkeyPlayer.ini'
+$legacy=Join-Path $runtime 'CodeMonkeyPlayer.ini'
 function NewPlayer {
-    $f=[Activator]::CreateInstance($a.GetType('CodeMonkeyPlayer.Form1'))
+    $f=$a.GetType('CodeMonkeyPlayer.Form1').GetConstructor($flags,$null,[type[]]@([string],[string]),$null).Invoke(@($ini.PSObject.BaseObject,$legacy.PSObject.BaseObject))
     $f.CreateControl()
     $p=$f.GetType().GetField('axWindowsMediaPlayer1',$flags).GetValue($f)
     $p.CreateControl()
@@ -26,7 +27,7 @@ function Assert($condition,$message) { if (!$condition) { throw $message } }
 $f=$null
 try {
     $f=NewPlayer
-    Assert (Test-Path -LiteralPath $ini) 'First run did not create settings beside executable'
+    Assert (Test-Path -LiteralPath $ini) 'First run did not create the user settings directory'
     Assert ((Field $f 'volume').Value -eq 70) 'Default volume is incorrect'
     (Field $f 'volume').Value=37
     (Field $f 'mute').Checked=$true
@@ -53,7 +54,56 @@ try {
     [IO.File]::WriteAllText($ini,'damaged file')
     $f=NewPlayer
     Assert ((Field $f 'volume').Value -eq 70) 'Malformed file did not use defaults'
+    $f.Dispose()
+    Remove-Item -LiteralPath $ini
+    [IO.File]::WriteAllLines($legacy,@('Volume=42','Muted=true','Repeat=false'))
+    $f=NewPlayer
+    Assert ((Field $f 'volume').Value -eq 42) 'Legacy volume migration failed'
+    Assert (Test-Path -LiteralPath $legacy) 'Migration deleted the legacy file'
+    $f.Dispose()
+    [IO.File]::WriteAllLines($legacy,@('Volume=99'))
+    $f=NewPlayer
+    Assert ((Field $f 'volume').Value -eq 42) 'Legacy file overwrote newer user settings'
+    $defaultPath=$a.GetType('CodeMonkeyPlayer.PlayerPreferences').GetProperty('DefaultPath').GetValue($null)
+    $localData=[Environment]::GetFolderPath([Environment+SpecialFolder]::LocalApplicationData,[Environment+SpecialFolderOption]::DoNotVerify)
+    if (!$localData) { $localData=$env:LOCALAPPDATA }
+    $expected=Join-Path $localData 'CodeMonkeyPlayer/CodeMonkeyPlayer.ini'
+    Assert ($defaultPath -eq $expected) 'Default path is not LocalApplicationData'
+    $area=[Windows.Forms.Screen]::PrimaryScreen.WorkingArea
+    $f.StartPosition='Manual'
+    $target=[Drawing.Rectangle]::new($area.Left+20,$area.Top+20,[Math]::Min(1000,$area.Width-40),[Math]::Min(600,$area.Height-40))
+    $f.Bounds=$target
+    $target=$f.Bounds
+    $f.GetType().GetMethod('SavePreferences',$flags).Invoke($f,@()) | Out-Null
+    $f.Dispose()
+    $f=NewPlayer
+    Assert ($f.Bounds -eq $target) 'Normal window placement did not survive restart'
+    $f.WindowState='Maximized'
+    $f.GetType().GetMethod('RememberWindowPlacement',$flags).Invoke($f,@()) | Out-Null
+    $f.WindowState='Minimized'
+    $f.GetType().GetMethod('RememberWindowPlacement',$flags).Invoke($f,@()) | Out-Null
+    $f.GetType().GetMethod('SavePreferences',$flags).Invoke($f,@()) | Out-Null
+    $f.Dispose()
+    $f=NewPlayer
+    Assert ($f.WindowState -eq 'Maximized') 'Minimized window lost prior maximized state'
+    Assert ((Field $f 'normalWindowBounds') -eq $target) 'Maximization overwrote normal bounds'
+    $f.GetType().GetMethod('ToggleFullscreen',$flags).Invoke($f,@()) | Out-Null
+    $f.GetType().GetMethod('SavePreferences',$flags).Invoke($f,@()) | Out-Null
+    $f.Dispose()
+    $f=NewPlayer
+    Assert ($f.WindowState -eq 'Maximized') 'Fullscreen lost previous maximized state'
+    Assert (!(Field $f 'fullscreen')) 'Restart unexpectedly entered fullscreen'
+    Assert ((Field $f 'normalWindowBounds') -eq $target) 'Fullscreen overwrote restored bounds'
+    $f.Dispose()
+    [IO.File]::WriteAllLines($ini,@('WindowX=900000','WindowY=-900000','WindowWidth=30000','WindowHeight=20000'))
+    $f=NewPlayer
+    Assert ([Windows.Forms.Screen]::FromRectangle($f.Bounds).WorkingArea.Contains($f.Bounds)) 'Off-screen window was not clamped'
+    Write-Output 'PASS: normal bounds, maximize/minimize, fullscreen preservation, off-screen recovery.'
+    Write-Output 'PASS: LocalAppData path, legacy migration, existing-settings precedence.'
     Write-Output 'PASS: creation, delayed save, final flush, restart restoration, engine volume, invalid values, corrupted file.'
 } finally {
     if($f) { $f.Dispose() }
 }
+
+
+

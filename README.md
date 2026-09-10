@@ -31,8 +31,8 @@ MP4, AVI, WMV, MKV, MOV, MPEG, WebM 및 주요 오디오 확장자를 목록에 
 
 ## 설정 저장
 
-실행 파일과 같은 폴더에 `CodeMonkeyPlayer.ini`를 첫 실행 시 자동 생성합니다.
-음량, 음소거, 목록 반복을 변경하면 0.5초 뒤 저장하며 종료 시에도 저장합니다.
+설정은 `%LocalAppData%\CodeMonkeyPlayer\CodeMonkeyPlayer.ini`에 자동 생성합니다.
+음량, 음소거, 목록 반복, 창 위치·크기·최대화 상태를 변경하면 0.5초 뒤 저장하며 종료 시에도 저장합니다.
 다음 실행에서 자동 복원합니다. 프로그램을 종료한 상태에서 직접 편집할 수도 있습니다.
 
 ```ini
@@ -44,7 +44,12 @@ Repeat=false
 
 Volume은 0~100이며 범위를 벗어난 숫자는 범위 내로 제한합니다.
 없거나 잘못된 항목은 기본값(음량 70, 음소거·반복 꺼짐)을 사용합니다.
-프로그램 폴더에 쓰기 권한이 없으면 상태 안내에 저장 실패를 표시합니다.
+새 설정 파일이 없고 실행 파일 옆에 기존 INI가 있으면 해당 값을 가져옵니다. 기존 파일은 삭제하지 않으며 사용자 폴더의 설정이 항상 우선합니다. 설치 프로그램은 개인 설정을 포함하거나 제거하지 않습니다.
+
+창 배치는 `WindowX`, `WindowY`, `WindowWidth`, `WindowHeight`, `WindowMaximized`로 저장합니다.
+최소화 상태로 종료하면 그 이전 일반/최대화 상태를 복원합니다.
+전체 화면으로 종료하면 전체 화면 진입 전 창 배치를 복원하며, 전체 화면 자체는 자동 재진입하지 않습니다.
+모니터가 제거되거나 해상도가 변경되어 저장 위치가 화면 밖이면 현재 모니터의 작업 영역 안으로 조정합니다.
 
 ## 단축키
 
@@ -67,6 +72,29 @@ FPS를 읽을 수 없는 파일은 역방향 이동을 실행하지 않고 안�
 가변 프레임 영상이나 일부 코덱에서는 정확한 한 프레임 이동에 한계가 있습니다.
 
 ## 빌드 및 검증
+
+### 설치 파일 만들기
+
+같은 솔루션의 `CodeMonkeyPlayer.Setup`은 WiX 6 기반 MSI 프로젝트입니다.
+Visual Studio의 .NET 데스크톱 개발 도구, .NET Framework 4.8 타기팅 팩과 .NET SDK 6 이상이 필요합니다.
+처음 빌드할 때 NuGet에서 고정 버전의 WiX 패키지를 복원합니다.
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File CodeMonkeyPlayer.Setup/Build-Installer.ps1
+```
+
+결과: `CodeMonkeyPlayer.Setup/bin/Release/CodeMonkeyPlayer-Setup.msi`
+
+MSI는 관리자 권한으로 Program Files (x86)에 설치하며 설치 폴더 선택, 시작 메뉴·바탕화면 바로가기,
+앱 제거 및 버전 업그레이드를 지원합니다. .NET Framework 4.8과 WMP ActiveX 등록 여부를 검사합니다.
+필요 구성 요소나 추가 코덱을 자동 설치하지는 않습니다. MSI와 실행 파일에는 코드 서명이 없습니다.
+사용자 설정은 앱과 별도로 보관하여 업데이트·제거 시 유지합니다.
+
+설치 프로젝트의 Visual Studio 편집 지원에는 WiX용 확장이 필요할 수 있습니다.
+위 스크립트는 Visual Studio 확장 없이도 MSI를 빌드합니다.
+버전을 올릴 때 `Package.wxs`의 Version과 앱 어셈블리 버전을 함께 변경하고 UpgradeCode는 유지하세요.
+
+### 플레이어 빌드
 
 Visual Studio에서 CodeMonkeyPlayer.slnx를 열고 빌드하거나,
 Visual Studio Developer PowerShell에서 다음 명령을 실행합니다.
